@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from remove_accents import remove_accents 
+from remove_accents import RemoveAccents 
 
 
 class NeuralNet(nn.Module):
@@ -17,5 +17,4 @@ class NeuralNet(nn.Module):
         out = self.l2(out)
         out = self.relu(out)
         out = self.l3(out)
-        # no activation and no softmax at the end
         return out

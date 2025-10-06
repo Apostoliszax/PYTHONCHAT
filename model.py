@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from remove_accents import RemoveAccents 
+from removeAccents import RemoveAccents 
 
 
 class NeuralNet(nn.Module):

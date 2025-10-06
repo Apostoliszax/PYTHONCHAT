@@ -1,6 +1,5 @@
 import numpy as np
 import json
-
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -8,121 +7,126 @@ from torch.utils.data import Dataset, DataLoader
 from nltk_utils import BagOfWords, tokenize, stem
 from model import NeuralNet
 
-with open('intents.json', 'r', encoding='utf-8') as f:
-    intents = json.load(f)
 
-all_words = []
-tags = []
-xy = []
-# loop through each sentence in our intents patterns
-for intent in intents['intents']:
-    tag = intent['tag']
-    # add to tag list
-    tags.append(tag)
-    for pattern in intent['patterns']:
-        # tokenize each word in the sentence
-        w = tokenize(pattern)
-        # add to our words list
-        all_words.extend(w)
-        # add to xy pair
-        xy.append((w, tag))
+def LoadIntents(filePath):
+    with open(filePath, 'r', encoding='utf-8') as file:
+        return json.load(file)
 
-# stem and lower each word
-ignore_words = ['?', '.', '!','που','ποτε','ποιος','τι']
-all_words = [stem(w) for w in all_words if w not in ignore_words]
-# remove duplicates and sort
-all_words = sorted(set(all_words))
-tags = sorted(set(tags))
 
-print(len(xy), "patterns")
-print(len(tags), "tags:", tags)
-print(len(all_words), "unique stemmed words:", all_words)
+def PreprocessIntents(intents, ignoreWords):
+    AllWords = []
+    tags = []
+    xy = []
+    for intent in intents['intents']:
+        tag = intent['tag']
+        tags.append(tag)
+        for pattern in intent['patterns']:
+            tokenized = tokenize(pattern)
+            AllWords.extend(tokenized)
+            xy.append((tokenized, tag))
 
-# create training data
-X_train = []
-y_train = []
-for (pattern_sentence, tag) in xy:
-    # X: bag of words for each pattern_sentence
-    bag = BagOfWords(pattern_sentence, all_words)
-    X_train.append(bag)
-    # y: PyTorch CrossEntropyLoss needs only class labels, not one-hot
-    label = tags.index(tag)
-    y_train.append(label)
+    AllWords = sorted(set(stem(w) for w in AllWords if w not in ignoreWords))
+    tags = sorted(set(tags))
 
-X_train = np.array(X_train)
-y_train = np.array(y_train)
+    return AllWords, tags, xy
 
-# Hyper-parameters 
-num_epochs = 1000
-batch_size = 8
-learning_rate = 0.001
-input_size = len(X_train[0])
-hidden_size = 8
-output_size = len(tags)
-print(input_size, output_size)
+
+def CreateTrainingData(xy, allWords, tags):
+    X_train = []
+    y_train = []
+
+    for (patternSentence, tag) in xy:
+        bag = BagOfWords(patternSentence, allWords)
+        X_train.append(bag)
+        label = tags.index(tag)
+        y_train.append(label)
+
+    return np.array(X_train), np.array(y_train)
+
 
 class ChatDataset(Dataset):
-
-    def __init__(self):
-        self.n_samples = len(X_train)
+    def __init__(self, X_train, y_train):
         self.x_data = X_train
         self.y_data = y_train
 
-    # support indexing such that dataset[i] can be used to get i-th sample
     def __getitem__(self, index):
         return self.x_data[index], self.y_data[index]
 
-    # we can call len(dataset) to return the size
     def __len__(self):
-        return self.n_samples
-
-dataset = ChatDataset()
-train_loader = DataLoader(dataset=dataset,
-                          batch_size=batch_size,
-                          shuffle=True,
-                          num_workers=0)
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-model = NeuralNet(input_size, hidden_size, output_size).to(device)
-
-# Loss and optimizer
-criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
-# Train the model
-for epoch in range(num_epochs):
-    for (words, labels) in train_loader:
-        words = words.to(device)
-        labels = labels.to(dtype=torch.long).to(device)
-        
-        # Forward pass
-        outputs = model(words)
-        # if y would be one-hot, we must apply
-        # labels = torch.max(labels, 1)[1]
-        loss = criterion(outputs, labels)
-        
-        # Backward and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        
-    if (epoch+1) % 100 == 0:
-        print (f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+        return len(self.x_data)
 
 
-print(f'final loss: {loss.item():.4f}')
+def CreateDataloader(X_train, y_train, batchSize):
+    dataset = ChatDataset(X_train, y_train)
+    return DataLoader(dataset=dataset, batch_size=batchSize, shuffle=True, num_workers=0)
 
-data = {
-"model_state": model.state_dict(),
-"input_size": input_size,
-"hidden_size": hidden_size,
-"output_size": output_size,
-"all_words": all_words,
-"tags": tags
-}
 
-FILE = "data.pth"
-torch.save(data, FILE)
+def train(model, device, train_loader, criterion, optimizer, num_epochs):
+    model.train()
+    for epoch in range(num_epochs):
+        for words, labels in train_loader:
+            words, labels = words.to(device), labels.to(dtype=torch.long).to(device)
 
-print(f'training complete. file saved to {FILE}')
+            outputs = model(words)
+            loss = criterion(outputs, labels)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        if (epoch + 1) % 100 == 0:
+            print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
+
+    print(f"Final loss: {loss.item():.4f}")
+    return model
+
+
+def SaveModel(model, inputSize, hiddenSize, outputSize, allWords, tags, filePath):
+    data = {
+        "model_state": model.state_dict(),
+        "input_size": inputSize,
+        "hidden_size": hiddenSize,
+        "output_size": outputSize,
+        "all_words": allWords,
+        "tags": tags
+    }
+    torch.save(data, filePath)
+    print(f"Training complete. Model saved to {filePath}")
+
+
+def main():
+    intents = LoadIntents('intents.json')
+    ignoreWords = ['?', '.', '!', 'που', 'ποτε', 'ποιος', 'τι']
+
+    allWords, tags, xy = PreprocessIntents(intents, ignoreWords)
+
+    print(f"{len(xy)} patterns")
+    print(f"{len(tags)} tags: {tags}")
+    print(f"{len(allWords)} unique stemmed words")
+
+    X_train, y_train = CreateTrainingData(xy, allWords, tags)
+
+    epochs = 1000
+    batchSize = 8
+    learningRate = 0.001
+    inputSize = len(X_train[0])
+    hiddenSize = 8
+    outputSize = len(tags)
+
+    print(f"Input size: {inputSize}, Output size: {outputSize}")
+
+    trainLoader = CreateDataloader(X_train, y_train, batchSize)
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = NeuralNet(inputSize, hiddenSize, outputSize).to(device)
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=learningRate)
+
+    model = train(model, device, trainLoader, criterion, optimizer, epochs)
+
+    SaveModel(model, inputSize, hiddenSize, outputSize, allWords, tags, "data.pth")
+
+
+if __name__ == "__main__":
+    main()

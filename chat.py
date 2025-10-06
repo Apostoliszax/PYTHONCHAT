@@ -6,7 +6,7 @@ import json
 
 from model import NeuralNet
 from nltk_utils import BagOfWords, tokenize
-from remove_accents import RemoveAccents
+from removeAccents import RemoveAccents
 
 app = Flask(__name__)
 CORS(app)

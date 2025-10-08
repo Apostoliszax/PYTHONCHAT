@@ -5,7 +5,7 @@ import random
 import json
 
 from model import NeuralNet
-from nltk_utils import BagOfWords, tokenize
+from nltkUtils import BagOfWords, tokenize
 from removeAccents import RemoveAccents
 
 app = Flask(__name__)

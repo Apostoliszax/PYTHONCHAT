@@ -1,20 +1,29 @@
 import torch
 import torch.nn as nn
-from removeAccents import RemoveAccents 
-
 
 class NeuralNet(nn.Module):
-    def __init__(self, input_size, hidden_size, num_classes):
+    def __init__(self, input_size, hidden_size, num_classes, dropout=0.3):
         super(NeuralNet, self).__init__()
-        self.l1 = nn.Linear(input_size, hidden_size) 
-        self.l2 = nn.Linear(hidden_size, hidden_size) 
-        self.l3 = nn.Linear(hidden_size, num_classes)
-        self.relu = nn.ReLU()
-    
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.act1 = nn.ReLU()
+        self.dropout1 = nn.Dropout(dropout)
+
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.act2 = nn.ReLU()
+        self.dropout2 = nn.Dropout(dropout)
+
+        self.fc3 = nn.Linear(hidden_size, hidden_size)
+        self.act3 = nn.ReLU()
+        self.dropout3 = nn.Dropout(dropout)
+
+        self.out = nn.Linear(hidden_size, num_classes)
+
     def forward(self, x):
-        out = self.l1(x)
-        out = self.relu(out)
-        out = self.l2(out)
-        out = self.relu(out)
-        out = self.l3(out)
-        return out
+        x = self.act1(self.fc1(x))
+        x = self.dropout1(x)
+        x = self.act2(self.fc2(x))
+        x = self.dropout2(x)
+        x = self.act3(self.fc3(x))
+        x = self.dropout3(x)
+        x = self.out(x)
+        return x

@@ -24,11 +24,9 @@ tags = data["tags"]
 ModelState = data["model_state"]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = NeuralNet(InputSize, HiddenSize, OutputSize).to(device)
+model = NeuralNet(InputSize, HiddenSize, OutputSize, dropout=0.0).to(device)
 model.load_state_dict(ModelState)
 model.eval()
-
-BotName = "Uniwa EEE Chat"
 
 def PreprocessSentence(sentence):
     sentence = RemoveAccents(sentence.lower())
@@ -37,15 +35,13 @@ def PreprocessSentence(sentence):
 def GetResponseFromModel(sentence):
     X = PreprocessSentence(sentence)
     X = X.reshape(1, X.shape[0])
-    X_tensor = torch.from_numpy(X).to(device)
-
+    X_tensor = torch.from_numpy(X).float().to(device)
     output = model(X_tensor)
     _, predicted = torch.max(output, dim=1)
     tag = tags[predicted.item()]
-
     probs = torch.softmax(output, dim=1)
     prob = probs[0][predicted.item()]
-
+    print(f"DEBUG Input: {sentence}, Predicted Tag: {tag}, Confidence: {prob.item()}") # debugging
     ProbLimit = 0.75
     if prob.item() > ProbLimit:
         for intent in intents["intents"]:
@@ -61,11 +57,9 @@ def chat():
         GetResponseFromModel(sentence) or
         "Δεν κατάλαβα... Προσπαθήστε ξανά."
     )
-
     response = (
         "Παρακαλώ πληκτρολογήστε κάτι." if not sentence else response
     )
-
     return jsonify({"response": response})
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ import torch
 import random
 import json
 
-from model import NeuralNet
+from model import NeuralNetwork
 from nltkUtils import BagOfWords, tokenize
 from removeAccents import RemoveAccents
 
@@ -24,7 +24,7 @@ tags = data["tags"]
 ModelState = data["model_state"]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = NeuralNet(InputSize, HiddenSize, OutputSize, dropout=0.0).to(device)
+model = NeuralNetwork(InputSize, HiddenSize, OutputSize, dropout=0.0).to(device)
 model.load_state_dict(ModelState)
 model.eval()
 
